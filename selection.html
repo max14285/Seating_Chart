@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學生志願選填 - 第二段程式</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f7f9; }
+        h1 { color: #007bff; text-align: center; }
+        .controls { background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin-bottom: 20px; display: flex; align-items: center; gap: 20px; }
+        .controls label { font-weight: bold; }
+        .controls select, .controls button { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
+        
+        #uploadBtn { background-color: #28a745; color: white; border: none; cursor: pointer; transition: background-color 0.3s; }
+        #uploadBtn:hover { background-color: #1e7e34; }
+        #clearBtn { background-color: #dc3545; color: white; border: none; cursor: pointer; transition: background-color 0.3s; }
+        #clearBtn:hover { background-color: #c82333; }
+
+        .seating-chart-container { display: flex; justify-content: center; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        #seatMap { display: grid; gap: 5px; }
+        
+        .seat { 
+            background-color: #007bff; color: white; font-weight: bold; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 60px; width: 60px; border-radius: 6px; cursor: pointer; 
+            transition: background-color 0.3s; border: 3px solid transparent; 
+            font-size: 14px;
+        }
+        .seat.unavailable { background-color: #6c757d; cursor: not-allowed; opacity: 0.7; }
+        .seat:not(.unavailable):hover { background-color: #0056b3; border-color: #ffc107; }
+        
+        .seat-id { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+        .rank { font-size: 20px; line-height: 1; }
+        .seat.selected { border: 3px solid #ffc107; }
+    </style>
+</head>
+<body>
+
+    <h1>📝 座位志願選填</h1>
+
+    <div class="controls">
+        <label for="studentSelect">請選擇您的座號：</label>
+        <select id="studentSelect">
+            <option value="">-- 請選擇座號 --</option>
+        </select>
+        <button id="clearBtn">清空志願</button>
+        <button id="uploadBtn">上傳志願</button>
+    </div>
+
+    <div class="seating-chart-container">
+        <div id="seatMap">載入中...</div>
+    </div>
+
+    <script>
+        const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+        const studentSelect = document.getElementById('studentSelect');
+        const seatMapDiv = document.getElementById('seatMap');
+        const clearBtn = document.getElementById('clearBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        let currentSelections = []; // 當前選填的志願序，例如: ["A1", "C3", "B2"]
+        let currentStudentId = null;
+        let seatingConfig = null;
+        let studentData = null;
+        let volunteerData = {}; // 所有學生的志願結果
+
+        /**
+         * 讀取所有所需的數據 (配置、學生名單、志願結果)
+         */
+        function loadData() {
+            try {
+                // 載入座位配置
+                const configStr = localStorage.getItem('seating_config');
+                if (!configStr) {
+                    alert('錯誤：請先在「規格設定頁」設定座位表規格！');
+                    seatMapDiv.innerHTML = '請先設定座位表規格。';
+                    return false;
+                }
+                seatingConfig = JSON.parse(configStr);
+
+                // 載入學生名單
+                const studentStr = localStorage.getItem('student_data');
+                studentData = JSON.parse(studentStr);
+
+                // 載入志願結果
+                const volunteerStr = localStorage.getItem('volunteer_data');
+                if (volunteerStr) {
+                    volunteerData = JSON.parse(volunteerStr);
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('載入資料錯誤:', error);
+                alert('載入資料失敗，請確認設定檔是否正確。');
+                return false;
+            }
+        }
+
+        /**
+         * 填充學生座號下拉式選單
+         */
+        function populateStudentSelect() {
+            if (!studentData) return;
+            // 將座號按數字排序
+            const sortedKeys = Object.keys(studentData).sort((a, b) => parseInt(a) - parseInt(b));
+            
+            sortedKeys.forEach(id => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = `${id} 號 - ${studentData[id]}`;
+                studentSelect.appendChild(option);
+            });
+        }
+
+        /**
+         * 渲染座位表
+         */
+        function renderSeatMap() {
+            if (!seatingConfig) return;
+
+            seatMapDiv.innerHTML = '';
+            seatMapDiv.style.gridTemplateColumns = `repeat(${seatingConfig.cols}, auto)`;
+
+            for (let r = 0; r < seatingConfig.rows; r++) {
+                for (let c = 1; c <= seatingConfig.cols; c++) {
+                    const seatId = `${ROW_LETTERS[r]}${c}`;
+                    const seatEl = document.createElement('div');
+                    seatEl.classList.add('seat');
+                    seatEl.dataset.id = seatId;
+                    
+                    // 內容區
+                    const rankDiv = document.createElement('div');
+                    rankDiv.classList.add('rank');
+                    rankDiv.textContent = ''; // 志願序
+                    
+                    const idDiv = document.createElement('div');
+                    idDiv.classList.add('seat-id');
+                    idDiv.textContent = seatId; // 座位 ID
+                    
+                    seatEl.appendChild(rankDiv);
+                    seatEl.appendChild(idDiv);
+
+
+                    if (seatingConfig.unavailable.includes(seatId)) {
+                        seatEl.classList.add('unavailable');
+                        seatEl.title = '不可選座位';
+                        seatMapDiv.appendChild(seatEl);
+                        continue; // 不可點擊
+                    }
+                    
+                    seatEl.addEventListener('click', handleSeatClick);
+                    seatMapDiv.appendChild(seatEl);
+                }
+            }
+        }
+
+        /**
+         * 根據 currentSelections 重新繪製志願序標記
+         */
+        function updateSeatRanks() {
+            document.querySelectorAll('.seat').forEach(seat => {
+                const seatId = seat.dataset.id;
+                const rankDiv = seat.querySelector('.rank');
+                
+                // 清空狀態
+                seat.classList.remove('selected');
+                rankDiv.textContent = ''; 
+
+                const rankIndex = currentSelections.indexOf(seatId);
+                
+                if (rankIndex !== -1) {
+                    const rank = rankIndex + 1;
+                    rankDiv.textContent = rank;
+                    seat.classList.add('selected'); // 標記為已選
+                }
+            });
+        }
+
+        /**
+         * 處理座位點擊事件（設定志願序）
+         * @param {Event} event 
+         */
+        function handleSeatClick(event) {
+            if (!currentStudentId) {
+                alert('請先在上方下拉式選單選擇您的座號！');
+                return;
+            }
+
+            const seatEl = event.currentTarget;
+            const seatId = seatEl.dataset.id;
+
+            if (seatEl.classList.contains('unavailable')) return;
+
+            const index = currentSelections.indexOf(seatId);
+
+            if (index === -1) {
+                // 1. 點擊新座位 -> 新增為下一志願
+                currentSelections.push(seatId);
+            } else {
+                // 2. 點擊已選座位 -> 移除該志願，後續志願遞補
+                currentSelections.splice(index, 1);
+            }
+            
+            updateSeatRanks();
+        }
+
+        /**
+         * 處理學生座號選擇變化
+         */
+        studentSelect.addEventListener('change', function() {
+            const selectedId = this.value;
+            if (selectedId) {
+                currentStudentId = selectedId;
+                // 載入該學生已儲存的志願
+                currentSelections = volunteerData[currentStudentId] ? [...volunteerData[currentStudentId]] : [];
+            } else {
+                currentStudentId = null;
+                currentSelections = [];
+            }
+            
+            updateSeatRanks();
+        });
+
+        /**
+         * 處理清空志願按鈕
+         */
+        clearBtn.addEventListener('click', function() {
+            if (!currentStudentId) {
+                alert('請先選擇座號！');
+                return;
+            }
+            if (confirm(`確定要清空 ${currentStudentId} 號的志願嗎？`)) {
+                currentSelections = [];
+                updateSeatRanks();
+                alert('志願已清空 (尚未儲存)！');
+            }
+        });
+
+        /**
+         * 處理上傳志願按鈕
+         */
+        uploadBtn.addEventListener('click', function() {
+            if (!currentStudentId) {
+                alert('請先選擇座號！');
+                return;
+            }
+            
+            if (currentSelections.length === 0) {
+                 if (!confirm(`您尚未選填任何志願，確定要儲存空的志願嗎？`)) {
+                    return;
+                }
+            }
+
+            // 儲存到志願數據結構中
+            volunteerData[currentStudentId] = currentSelections;
+            
+            // 儲存到 LocalStorage
+            localStorage.setItem('volunteer_data', JSON.stringify(volunteerData));
+            
+            alert(`${currentStudentId} 號 ( ${studentData[currentStudentId]} ) 的 ${currentSelections.length} 個志願已成功儲存！`);
+        });
+
+        // 初始化
+        if (loadData()) {
+            populateStudentSelect();
+            renderSeatMap();
+        }
+    </script>
+</body>
+</html>
