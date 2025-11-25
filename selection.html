@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學生志願選填</title>
+    <title>學生志願選填 - 第二段程式</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f7f9; }
         h1 { color: #007bff; text-align: center; }
@@ -32,6 +32,8 @@
         .seat-id { font-size: 10px; opacity: 0.8; margin-top: 2px; }
         .rank { font-size: 20px; line-height: 1; }
         .seat.selected { border: 3px solid #ffc107; }
+
+        .note { margin-top: 20px; padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; border-radius: 5px; font-weight: bold;}
     </style>
 </head>
 <body>
@@ -44,11 +46,15 @@
             <option value="">-- 請選擇座號 --</option>
         </select>
         <button id="clearBtn">清空志願</button>
-        <button id="uploadBtn">上傳志願</button>
+        <button id="uploadBtn">上傳志願 (下載 volunteers.json)</button>
     </div>
 
     <div class="seating-chart-container">
         <div id="seatMap">載入中...</div>
+    </div>
+    
+    <div class="note">
+        **重要提示：** 點擊上傳後，會下載 **volunteers.json** 檔案。您必須手動將此檔案提交到您的 GitHub 儲存庫中，才能記錄志願。
     </div>
 
     <script>
@@ -58,40 +64,41 @@
         const clearBtn = document.getElementById('clearBtn');
         const uploadBtn = document.getElementById('uploadBtn');
 
-        let currentSelections = []; // 當前選填的志願序，例如: ["A1", "C3", "B2"]
+        let currentSelections = []; 
         let currentStudentId = null;
         let seatingConfig = null;
         let studentData = null;
-        let volunteerData = {}; // 所有學生的志願結果
+        let volunteerData = {}; 
 
         /**
-         * 讀取所有所需的數據 (配置、學生名單、志願結果)
+         * 讀取所有所需的數據 (從 config.json 和 volunteers.json 讀取)
          */
-        function loadData() {
+        async function loadData() {
             try {
-                // 載入座位配置
-                const configStr = localStorage.getItem('seating_config');
-                if (!configStr) {
-                    alert('錯誤：請先在「規格設定頁」設定座位表規格！');
-                    seatMapDiv.innerHTML = '請先設定座位表規格。';
-                    return false;
-                }
-                seatingConfig = JSON.parse(configStr);
-
-                // 載入學生名單
+                // 載入學生名單 (從 LocalStorage 讀取)
                 const studentStr = localStorage.getItem('student_data');
+                if (!studentStr) throw new Error('學生名單未載入，請先運行 setting.html');
                 studentData = JSON.parse(studentStr);
 
-                // 載入志願結果
-                const volunteerStr = localStorage.getItem('volunteer_data');
-                if (volunteerStr) {
-                    volunteerData = JSON.parse(volunteerStr);
+                // 從 config.json 檔案載入座位配置
+                const configResponse = await fetch('config.json');
+                if (!configResponse.ok) throw new Error('config.json 檔案不存在或無法讀取。請先在 setting.html 儲存配置。');
+                seatingConfig = await configResponse.json();
+
+                // 從 volunteers.json 檔案載入志願結果
+                const volunteerResponse = await fetch('volunteers.json');
+                if (volunteerResponse.ok && volunteerResponse.status !== 204) { // 檢查狀態碼避免讀取空內容
+                    const text = await volunteerResponse.text();
+                    volunteerData = text ? JSON.parse(text) : {}; 
+                } else {
+                    volunteerData = {}; 
                 }
                 
                 return true;
             } catch (error) {
                 console.error('載入資料錯誤:', error);
-                alert('載入資料失敗，請確認設定檔是否正確。');
+                alert(`載入資料失敗：${error.message}`);
+                seatMapDiv.innerHTML = `載入錯誤：${error.message}`;
                 return false;
             }
         }
@@ -101,7 +108,6 @@
          */
         function populateStudentSelect() {
             if (!studentData) return;
-            // 將座號按數字排序
             const sortedKeys = Object.keys(studentData).sort((a, b) => parseInt(a) - parseInt(b));
             
             sortedKeys.forEach(id => {
@@ -128,24 +134,21 @@
                     seatEl.classList.add('seat');
                     seatEl.dataset.id = seatId;
                     
-                    // 內容區
                     const rankDiv = document.createElement('div');
                     rankDiv.classList.add('rank');
-                    rankDiv.textContent = ''; // 志願序
                     
                     const idDiv = document.createElement('div');
                     idDiv.classList.add('seat-id');
-                    idDiv.textContent = seatId; // 座位 ID
+                    idDiv.textContent = seatId; 
                     
                     seatEl.appendChild(rankDiv);
                     seatEl.appendChild(idDiv);
-
 
                     if (seatingConfig.unavailable.includes(seatId)) {
                         seatEl.classList.add('unavailable');
                         seatEl.title = '不可選座位';
                         seatMapDiv.appendChild(seatEl);
-                        continue; // 不可點擊
+                        continue; 
                     }
                     
                     seatEl.addEventListener('click', handleSeatClick);
@@ -162,7 +165,6 @@
                 const seatId = seat.dataset.id;
                 const rankDiv = seat.querySelector('.rank');
                 
-                // 清空狀態
                 seat.classList.remove('selected');
                 rankDiv.textContent = ''; 
 
@@ -171,14 +173,13 @@
                 if (rankIndex !== -1) {
                     const rank = rankIndex + 1;
                     rankDiv.textContent = rank;
-                    seat.classList.add('selected'); // 標記為已選
+                    seat.classList.add('selected'); 
                 }
             });
         }
 
         /**
          * 處理座位點擊事件（設定志願序）
-         * @param {Event} event 
          */
         function handleSeatClick(event) {
             if (!currentStudentId) {
@@ -207,11 +208,12 @@
         /**
          * 處理學生座號選擇變化
          */
-        studentSelect.addEventListener('change', function() {
+        studentSelect.addEventListener('change', async function() {
             const selectedId = this.value;
             if (selectedId) {
                 currentStudentId = selectedId;
-                // 載入該學生已儲存的志願
+                // 重新載入最新志願數據以防其他學生同時提交
+                await loadData(); 
                 currentSelections = volunteerData[currentStudentId] ? [...volunteerData[currentStudentId]] : [];
             } else {
                 currentStudentId = null;
@@ -232,12 +234,29 @@
             if (confirm(`確定要清空 ${currentStudentId} 號的志願嗎？`)) {
                 currentSelections = [];
                 updateSeatRanks();
-                alert('志願已清空 (尚未儲存)！');
+                alert('志願已清空 (尚未上傳儲存)！');
             }
         });
 
+        // 替換 downloadJsonFile 函數（與 setting.html 相同）
+        function downloadJsonFile(data, filename) {
+            const dataStr = JSON.stringify(data, null, 4); 
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert(`志願已成功打包為 ${filename}，請下載後手動提交到 GitHub！`);
+        }
+        
         /**
-         * 處理上傳志願按鈕
+         * 處理上傳志願按鈕 (下載 volunteers.json)
          */
         uploadBtn.addEventListener('click', function() {
             if (!currentStudentId) {
@@ -251,20 +270,20 @@
                 }
             }
 
-            // 儲存到志願數據結構中
+            // 更新志願數據結構
             volunteerData[currentStudentId] = currentSelections;
             
-            // 儲存到 LocalStorage
-            localStorage.setItem('volunteer_data', JSON.stringify(volunteerData));
-            
-            alert(`${currentStudentId} 號 ( ${studentData[currentStudentId]} ) 的 ${currentSelections.length} 個志願已成功儲存！`);
+            // 將所有志願資料下載為 volunteers.json 檔案
+            downloadJsonFile(volunteerData, 'volunteers.json');
         });
 
         // 初始化
-        if (loadData()) {
-            populateStudentSelect();
-            renderSeatMap();
-        }
+        (async function() {
+            if (await loadData()) {
+                populateStudentSelect();
+                renderSeatMap();
+            }
+        })();
     </script>
 </body>
 </html>
