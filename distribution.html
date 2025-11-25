@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>座位分發系統</title>
+    <title>座位分發系統 - 第三段程式</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f7f9; }
         h1 { color: #007bff; text-align: center; }
@@ -82,30 +82,41 @@
         let seatingConfig = null;
         let studentData = null;
         let volunteerData = {};
-        let finalDistribution = {}; // 最終分發結果: { "A1": "5", "B2": "12", ... }
-
-        let availableSeats = []; // 可選座位列表
+        let finalDistribution = {}; 
+        let availableSeats = []; 
 
         /**
-         * 讀取所有所需的數據
+         * 讀取所有所需的數據 (從 config.json 和 volunteers.json 讀取)
          */
-        function loadData() {
+        async function loadData() {
             try {
-                const configStr = localStorage.getItem('seating_config');
+                // 載入學生名單 (從 LocalStorage 讀取)
                 const studentStr = localStorage.getItem('student_data');
-                const volunteerStr = localStorage.getItem('volunteer_data');
+                if (!studentStr) throw new Error('學生名單未載入，請先運行 setting.html');
+                studentData = JSON.parse(studentStr);
 
-                if (!configStr || !studentStr) {
-                    alert('錯誤：請先在「規格設定頁」設定座位表規格並確認學生名單已載入！');
-                    seatMapDiv.innerHTML = '請先設定座位表規格。';
-                    return false;
+                // 從 config.json 檔案載入座位配置
+                const configResponse = await fetch('config.json');
+                if (!configResponse.ok) throw new Error('config.json 檔案不存在或無法讀取。請先在 setting.html 儲存配置。');
+                seatingConfig = await configResponse.json();
+
+                // 從 volunteers.json 檔案載入志願結果
+                const volunteerResponse = await fetch('volunteers.json');
+                if (volunteerResponse.ok && volunteerResponse.status !== 204) {
+                    const text = await volunteerResponse.text();
+                    volunteerData = text ? JSON.parse(text) : {}; 
+                } else {
+                    volunteerData = {}; 
+                }
+
+                // 從 LocalStorage 載入最終分發結果 (分發後儲存於此，方便重整頁面)
+                const finalDistributionStr = localStorage.getItem('final_distribution');
+                if (finalDistributionStr) {
+                    finalDistribution = JSON.parse(finalDistributionStr);
                 }
                 
-                seatingConfig = JSON.parse(configStr);
-                studentData = JSON.parse(studentStr);
-                volunteerData = volunteerStr ? JSON.parse(volunteerStr) : {};
-                
                 // 計算可選座位
+                availableSeats = [];
                 for (let r = 0; r < seatingConfig.rows; r++) {
                     for (let c = 1; c <= seatingConfig.cols; c++) {
                         const seatId = `${ROW_LETTERS[r]}${c}`;
@@ -115,16 +126,11 @@
                     }
                 }
 
-                // 載入或初始化最終分發結果
-                const finalDistributionStr = localStorage.getItem('final_distribution');
-                if (finalDistributionStr) {
-                    finalDistribution = JSON.parse(finalDistributionStr);
-                }
-
                 return true;
             } catch (error) {
                 console.error('載入資料錯誤:', error);
-                alert('載入資料失敗，請確認設定檔是否正確。');
+                alert(`載入資料失敗：${error.message}`);
+                seatMapDiv.innerHTML = `載入錯誤：${error.message}`;
                 return false;
             }
         }
@@ -134,7 +140,6 @@
          */
         function renderStudentStatus() {
             studentStatusListDiv.innerHTML = '';
-            // 確保座號按數字排序
             const studentIds = Object.keys(studentData).sort((a, b) => parseInt(a) - parseInt(b));
 
             studentIds.forEach(id => {
@@ -163,7 +168,7 @@
             seatMapDiv.innerHTML = '';
             seatMapDiv.style.gridTemplateColumns = `repeat(${seatingConfig.cols}, auto)`;
 
-            // 反轉 finalDistribution 方便查找：{"5": "A1", "12": "B2"}
+            // 反轉 finalDistribution 方便查找學生座號
             const studentToSeat = {};
             for (const seatId in finalDistribution) {
                 const studentId = finalDistribution[seatId];
@@ -176,16 +181,17 @@
                     const seatEl = document.createElement('div');
                     seatEl.classList.add('seat');
                     
-                    const studentId = studentToSeat[seatId] || null;
+                    // 找出哪個學生的座位是這個
+                    const studentId = Object.keys(studentToSeat).find(id => studentToSeat[id] === seatId);
 
                     seatEl.innerHTML = `
-                        <div class="student-id">${studentId || ''}</div>
+                        <div class="student-id">${finalDistribution[seatId] || ''}</div>
                         <div class="seat-id">${seatId}</div>
                     `;
 
                     if (seatingConfig.unavailable.includes(seatId)) {
                         seatEl.classList.add('unavailable');
-                    } else if (studentId) {
+                    } else if (finalDistribution[seatId]) {
                         seatEl.classList.add('distributed');
                     }
                     
@@ -197,7 +203,6 @@
 
         /**
          * 產生隨機分發順序
-         * @returns {string[]} 學生座號列表
          */
         function generateRandomOrder() {
             const studentIds = Object.keys(studentData);
@@ -218,10 +223,10 @@
             orderListUl.innerHTML = '';
             renderSeatMap(); // 顯示空白座位表
             
-            let currentAvailableSeats = [...availableSeats]; // 複製一份可選座位
+            let currentAvailableSeats = [...availableSeats]; 
 
             const distributionOrder = generateRandomOrder();
-            let orderListItems = {}; // 儲存 DOM 元素以便後續更新狀態
+            let orderListItems = {}; 
 
             // 1. 顯示隨機分發順序
             distributionOrder.forEach(id => {
@@ -259,9 +264,8 @@
                     if (currentAvailableSeats.length > 0) {
                         const randomIndex = Math.floor(Math.random() * currentAvailableSeats.length);
                         assignedSeat = currentAvailableSeats[randomIndex];
-                        currentAvailableSeats.splice(randomIndex, 1); // 移除此座位
+                        currentAvailableSeats.splice(randomIndex, 1); 
                     } else {
-                        // 沒座位了 (理論上不該發生，除非學生人數多於座位數)
                         console.warn(`學生 ${studentId} 無法分發到座位！`);
                         continue;
                     }
@@ -285,22 +289,22 @@
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
             
-            // 6. 分發完成，儲存結果
+            // 6. 分發完成，儲存結果到 LocalStorage
             localStorage.setItem('final_distribution', JSON.stringify(finalDistribution));
-            alert('座位已全部分發完畢！結果已儲存。');
+            alert('座位已全部分發完畢！結果已儲存於瀏覽器。');
             distributeBtn.disabled = false;
         }
 
-        // --- 初始化程式碼 ---
-
-        if (loadData()) {
-            renderStudentStatus();
-            renderSeatMap();
-            distributeBtn.addEventListener('click', startDistribution);
-        } else {
-            // 如果載入失敗，禁用按鈕
-            distributeBtn.disabled = true;
-        }
+        // 初始化
+        (async function() {
+            if (await loadData()) {
+                renderStudentStatus();
+                renderSeatMap();
+                distributeBtn.addEventListener('click', startDistribution);
+            } else {
+                distributeBtn.disabled = true;
+            }
+        })();
     </script>
 </body>
 </html>
