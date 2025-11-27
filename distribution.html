@@ -136,7 +136,7 @@
         // ... (renderStudentStatus, renderSeatMap, generateRandomOrder, startDistribution 函數都與之前版本相同，在此省略)
 
         /**
-         * 渲染學生選填狀態列表
+         * 渲染學生選填狀態列表 (更新版：支援無志願顯示)
          */
         function renderStudentStatus() {
             studentStatusListDiv.innerHTML = '';
@@ -144,16 +144,28 @@
 
             studentIds.forEach(id => {
                 const name = studentData[id];
-                const selections = volunteerData[id] || [];
-                const isFilled = selections.length > 0;
+                
+                // 【修改重點】區分 "未提交" (undefined) 和 "已提交但為空" (空陣列)
+                const selections = volunteerData[id]; 
+                const hasSubmitted = (selections !== undefined); // 是否有資料
+                
+                let statusHtml = '';
+                if (hasSubmitted) {
+                    if (selections.length > 0) {
+                         statusHtml = `<span class="status-filled">已填 (${selections.length})</span>`;
+                    } else {
+                         // 已提交，但志願數為 0
+                         statusHtml = `<span class="status-filled" style="color: #17a2b8;">無志願 (隨機)</span>`;
+                    }
+                } else {
+                    statusHtml = `<span class="status-empty">未填</span>`;
+                }
                 
                 const item = document.createElement('div');
                 item.classList.add('student-list-item');
                 item.innerHTML = `
                     <span>${id} 號 ${name}</span>
-                    <span class="${isFilled ? 'status-filled' : 'status-empty'}">
-                        ${isFilled ? `已填 (${selections.length})` : '未填'}
-                    </span>
+                    ${statusHtml}
                 `;
                 studentStatusListDiv.appendChild(item);
             });
