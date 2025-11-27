@@ -2,160 +2,364 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>座位分發系統</title>
     <style>
-         /* 請複製之前的 CSS */
-         body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f7f9; }
-         /* ... */
-         #seatMap { display: grid; gap: 5px; margin-top: 20px; }
-         .seat { width: 60px; height: 60px; background: #e9ecef; border: 1px solid #ccc; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-         .seat.unavailable { background: #6c757d; opacity: 0.7; }
-         .seat.distributed { background: #007bff; color: white; }
-         .student-id { font-size: 20px; font-weight: bold; }
-         .seat-id { font-size: 10px; }
-         .sidebar { float:left; width: 250px; background: white; padding: 10px; margin-right: 20px;}
-         .chart-area { overflow: hidden; }
+        /* --- 基礎樣式 --- */
+        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; padding: 20px; background-color: #f4f7f9; display: flex; flex-direction: column; height: 95vh; box-sizing: border-box; }
+        h1 { color: #333; text-align: center; margin: 0 0 20px 0; font-size: 24px; }
+        
+        /* --- 版面配置 --- */
+        .main-container { display: flex; gap: 20px; flex: 1; overflow: hidden; }
+        
+        /* 側邊欄 (加寬以容納表格) */
+        .sidebar { 
+            width: 400px; 
+            background-color: #fff; 
+            padding: 15px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px;
+        }
+
+        /* 側邊欄區塊標題 */
+        h3 { margin: 0 0 10px 0; color: #555; border-bottom: 2px solid #eee; padding-bottom: 5px; font-size: 16px; }
+
+        /* 區塊 1: 學生名單與設定 (可捲動) */
+        .panel-section { flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 6px; padding: 5px; }
+        
+        /* 表格樣式 */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { text-align: left; background: #f8f9fa; padding: 5px; position: sticky; top: 0; }
+        td { padding: 5px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        
+        /* 輸入框 */
+        input.adj-input { width: 40px; padding: 3px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
+        
+        /* 狀態標籤 */
+        .tag { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .tag-filled { background: #e3f2fd; color: #0d47a1; }
+        .tag-empty { background: #ffebee; color: #c62828; }
+        .tag-random { background: #e0f2f1; color: #00695c; }
+
+        /* 區塊 2: 分發順序列表 */
+        #orderList { list-style: none; padding: 0; margin: 0; }
+        #orderList li { 
+            padding: 8px; margin-bottom: 4px; background: #f8f9fa; border-radius: 4px; font-size: 14px; 
+            display: flex; justify-content: space-between; border-left: 4px solid transparent;
+        }
+        #orderList li.active { border-left-color: #ffc107; background: #fff3cd; font-weight: bold; }
+        #orderList li.done { border-left-color: #28a745; background: #d4edda; color: #155724; }
+
+        /* 按鈕群組 */
+        .btn-group { display: flex; gap: 10px; margin-bottom: 5px; }
+        button { flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: all 0.2s; }
+        
+        #btnGenerate { background-color: #17a2b8; color: white; }
+        #btnGenerate:hover { background-color: #138496; }
+        
+        #btnStart { background-color: #28a745; color: white; }
+        #btnStart:hover:not(:disabled) { background-color: #218838; }
+        #btnStart:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* --- 右側座位表 --- */
+        .chart-area { flex-grow: 1; background-color: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); overflow: auto; display: flex; flex-direction: column; align-items: center; }
+
+        /* 講台 */
+        .stage-area { width: 100%; display: flex; justify-content: center; margin-bottom: 40px; }
+        .lectern { width: 180px; height: 50px; background-color: #795548; color: white; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: bold; letter-spacing: 3px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); border-bottom: 5px solid #5d4037; }
+
+        #seatMap { display: grid; gap: 8px; }
+        
+        /* 座位樣式 */
+        .seat { 
+            width: 65px; height: 65px; 
+            background-color: #f8f9fa; border: 2px solid #e9ecef; color: #495057;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            border-radius: 8px; transition: all 0.5s; position: relative;
+        }
+        .seat.unavailable { background-color: #ffebee; border-color: #ffcdd2; opacity: 0.6; }
+        
+        /* 已分發樣式 (明顯色彩) */
+        .seat.distributed { 
+            background-color: #007bff; border-color: #0056b3; color: white; 
+            transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,123,255,0.3); z-index: 10;
+        }
+        
+        .seat-id { font-size: 10px; margin-top: 2px; opacity: 0.8; }
+        .student-id { font-size: 20px; font-weight: bold; line-height: 1; }
     </style>
 </head>
 <body>
+
+    <h1>🧑‍🏫 座位分發系統</h1>
+
     <div class="main-container">
         <div class="sidebar">
-            <button id="distributeBtn" style="width:100%; padding:10px;">▶️ 開始分發</button>
-            <h3>狀態</h3>
-            <div id="statusList">載入中...</div>
+            <div class="btn-group">
+                <button id="btnGenerate">🎲 1. 產生隨機數與順序</button>
+                <button id="btnStart" disabled>▶️ 2. 開始分發</button>
+            </div>
+
+            <div class="panel-section" style="flex: 3;">
+                <h3>📋 學生名單與設定 (依座號)</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="15%">號</th>
+                            <th width="25%">姓名</th>
+                            <th width="20%">狀態</th>
+                            <th width="15%">調整</th>
+                            <th width="25%">隨機(總分)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTableBody">
+                        <tr><td colspan="5" align="center">載入中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="panel-section" style="flex: 2; background-color: #fffbf0;">
+                <h3>🏆 分發順序 (依高分排序)</h3>
+                <ul id="orderList">
+                    <li style="color:#999; text-align:center;">請先點擊「產生隨機數」</li>
+                </ul>
+            </div>
         </div>
+
         <div class="chart-area">
-            <div id="seatMap"></div>
+            <div class="stage-area">
+                <div class="lectern">講 台</div>
+            </div>
+            <div id="seatMap">載入中...</div>
         </div>
     </div>
 
     <script>
+        // **********************************************
+        // 🔹 請填入您的 Apps Script URL 🔹
         const APPS_SCRIPT_API_URL = 'https://script.google.com/macros/s/AKfycbz1qRFp0IC6RAUJvosl-ACMuCRD42S7mFUFZMp_vtsNs7nLLxhBWXtAfHm_E3E4iccOoA/exec'; // 請填入您的網址
+        // **********************************************
+
         const ROW_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
         
-        let globalData = {};
-        let finalDistribution = {};
+        // 全域變數
+        let globalData = {}; // 存放 API 回傳的完整資料
+        let adjustments = {}; // 存放手動調整的分數 { studentId: score }
+        let distributionOrder = []; // 最終排序後的學生 ID 陣列
+        let availableSeats = []; // 目前可用的座位
+        let finalDistribution = {}; // 最終結果
 
+        // 初始化
         async function init() {
             try {
+                // 1. 載入資料
                 const res = await fetch(APPS_SCRIPT_API_URL);
                 const json = await res.json();
                 globalData = json.data;
 
                 if (!globalData.students || !globalData.config) {
-                    alert("資料不完整 (缺名單或設定)，請檢查 Google Sheet SystemData 分頁。");
+                    alert("資料不完整，請檢查 Google Sheet SystemData 設定。");
                     return;
                 }
-                
-                // 載入上次分發結果
-                const savedDist = localStorage.getItem('final_distribution');
-                if (savedDist) finalDistribution = JSON.parse(savedDist);
 
-                renderStatus();
-                renderMap();
-                
-                document.getElementById('distributeBtn').onclick = startDistribute;
+                // 2. 渲染畫面
+                renderStudentTable();
+                renderSeatMap();
+
+                // 3. 綁定按鈕
+                document.getElementById('btnGenerate').onclick = generateOrder;
+                document.getElementById('btnStart').onclick = startDistribution;
 
             } catch (e) {
-                document.getElementById('statusList').innerHTML = "載入失敗: " + e.message;
+                console.error(e);
+                alert("載入失敗: " + e.message);
             }
         }
 
-        function renderStatus() {
-            const list = document.getElementById('statusList');
-            list.innerHTML = '';
-            Object.keys(globalData.students).sort((a,b)=>a-b).forEach(id => {
-                const hasVol = globalData.volunteers[id];
-                const div = document.createElement('div');
-                div.style.borderBottom = "1px dotted #ccc";
-                div.innerHTML = `${id}號 ${globalData.students[id]} : <span style="color:${hasVol?'green':'red'}">${hasVol ? (hasVol.length>0 ? '已填':'隨機') : '未填'}</span>`;
-                list.appendChild(div);
+        // 渲染左上角學生列表 (包含調整輸入框)
+        function renderStudentTable() {
+            const tbody = document.getElementById('studentTableBody');
+            tbody.innerHTML = '';
+            
+            const sortedIds = Object.keys(globalData.students).sort((a,b)=>a-b);
+
+            sortedIds.forEach(id => {
+                const name = globalData.students[id];
+                const wishes = globalData.volunteers[id];
+                
+                // 判斷狀態
+                let statusBadge = '<span class="tag tag-empty">未填</span>';
+                if (wishes) {
+                    statusBadge = wishes.length > 0 
+                        ? `<span class="tag tag-filled">已填</span>`
+                        : `<span class="tag tag-random">隨機</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${id}</td>
+                    <td>${name}</td>
+                    <td>${statusBadge}</td>
+                    <td><input type="number" class="adj-input" data-id="${id}" value="0"></td>
+                    <td class="score-cell" id="score-${id}">-</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // 綁定輸入框事件
+            document.querySelectorAll('.adj-input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const id = e.target.dataset.id;
+                    adjustments[id] = parseInt(e.target.value) || 0;
+                });
             });
         }
 
-        function renderMap() {
+        // 渲染右側座位表
+        function renderSeatMap() {
             const config = globalData.config;
             const map = document.getElementById('seatMap');
             map.innerHTML = '';
             map.style.gridTemplateColumns = `repeat(${config.cols}, auto)`;
 
-            // 反查表：哪個位置坐誰
-            const seatToStudent = {};
-            for(let sid in finalDistribution) seatToStudent[finalDistribution[sid]] = sid;
+            availableSeats = [];
 
             for(let r=0; r<config.rows; r++) {
                 for(let c=1; c<=config.cols; c++) {
                     const id = ROW_LETTERS[r] + c;
                     const div = document.createElement('div');
                     div.className = 'seat';
-                    
-                    // 顯示學生
-                    const sid = seatToStudent[id];
-                    div.innerHTML = `<div class="student-id">${sid||''}</div><div class="seat-id">${id}</div>`;
-
-                    if(config.unavailable.includes(id)) div.className += ' unavailable';
-                    else if(sid) div.className += ' distributed';
-                    
+                    div.innerHTML = `<div class="student-id"></div><div class="seat-id">${id}</div>`;
                     div.dataset.id = id;
+
+                    if(config.unavailable.includes(id)) {
+                        div.className += ' unavailable';
+                    } else {
+                        availableSeats.push(id); // 收集可用座位
+                    }
                     map.appendChild(div);
                 }
             }
         }
-        
-        // 分發邏輯與之前類似，省略部分代碼以節省篇幅，核心是使用 globalData.config 和 globalData.volunteers
-        // ... (請將之前成功的 startDistribution 函式貼過來，並將變數名稱替換成 globalData.students 等) ... 
-        
-        // 簡易版分發實作參考：
-        async function startDistribute() {
-             // 1. 準備空位
-             let seats = [];
-             const config = globalData.config;
-             for(let r=0; r<config.rows; r++)
-                for(let c=1; c<=config.cols; c++) {
-                    let id = ROW_LETTERS[r]+c;
-                    if(!config.unavailable.includes(id)) seats.push(id);
-                }
-             
-             // 2. 隨機排序學生
-             let sids = Object.keys(globalData.students);
-             sids.sort(() => Math.random() - 0.5);
-             
-             finalDistribution = {};
-             renderMap(); // 清空畫面
 
-             for(let sid of sids) {
-                 let wishes = globalData.volunteers[sid] || [];
-                 let assigned = null;
-                 
-                 // 找志願
-                 for(let w of wishes) {
-                     let idx = seats.indexOf(w);
-                     if(idx !== -1) {
-                         assigned = w;
-                         seats.splice(idx, 1);
-                         break;
-                     }
-                 }
-                 // 沒志願或志願被搶 -> 隨機
-                 if(!assigned && seats.length > 0) {
-                     let idx = Math.floor(Math.random() * seats.length);
-                     assigned = seats[idx];
-                     seats.splice(idx, 1);
-                 }
-                 
-                 if(assigned) {
-                     finalDistribution[sid] = assigned;
-                     // 簡單動畫效果：直接更新該座位
-                     let seatEl = document.querySelector(`.seat[data-id="${assigned}"]`);
-                     if(seatEl) {
-                         seatEl.classList.add('distributed');
-                         seatEl.querySelector('.student-id').textContent = sid;
-                     }
-                     await new Promise(r => setTimeout(r, 1000)); // 1秒一個
-                 }
-             }
-             localStorage.setItem('final_distribution', JSON.stringify(finalDistribution));
-             alert("分發完成");
+        // 步驟 1: 產生隨機數與順序
+        function generateOrder() {
+            distributionOrder = [];
+            const studentIds = Object.keys(globalData.students);
+            const scoreList = [];
+
+            // 計算分數
+            studentIds.forEach(id => {
+                const baseScore = Math.floor(Math.random() * 100); // 0-99 隨機數
+                const adj = adjustments[id] || 0;
+                const totalScore = baseScore + adj;
+
+                // 更新表格顯示: 85 (+5)
+                const cell = document.getElementById(`score-${id}`);
+                if(cell) {
+                    const sign = adj >= 0 ? '+' : '';
+                    cell.innerHTML = `<b>${totalScore}</b> <span style="color:#888;font-size:10px;">(${baseScore}${sign}${adj})</span>`;
+                }
+
+                scoreList.push({ id, totalScore });
+            });
+
+            // 排序 (高分在前)
+            scoreList.sort((a, b) => b.totalScore - a.totalScore);
+            distributionOrder = scoreList.map(item => item.id);
+
+            // 更新左下角順序列表
+            renderOrderList(scoreList);
+
+            // 啟用開始分發按鈕
+            document.getElementById('btnStart').disabled = false;
+            alert("隨機數已產生！請確認順序無誤後，按下「開始分發」。");
+        }
+
+        function renderOrderList(scoreList) {
+            const ul = document.getElementById('orderList');
+            ul.innerHTML = '';
+            scoreList.forEach((item, index) => {
+                const name = globalData.students[item.id];
+                const li = document.createElement('li');
+                li.id = `order-${item.id}`;
+                li.innerHTML = `
+                    <span>#${index+1} <b>${item.id}號</b> ${name}</span>
+                    <span>${item.totalScore}分</span>
+                `;
+                ul.appendChild(li);
+            });
+        }
+
+        // 步驟 2: 開始分發
+        async function startDistribution() {
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnGenerate').disabled = true;
+            
+            // 重置座位狀態
+            renderSeatMap(); 
+            finalDistribution = {};
+            let currentAvailable = [...availableSeats];
+
+            for (const sid of distributionOrder) {
+                // 標記目前正在分發的學生
+                const li = document.getElementById(`order-${sid}`);
+                if(li) {
+                    li.scrollIntoView({ behavior: "smooth", block: "center" });
+                    li.classList.add('active');
+                }
+
+                let assignedSeat = null;
+                const wishes = globalData.volunteers[sid] || []; // 取得志願 (可能是空陣列)
+
+                // 策略 1: 檢查志願
+                for (const seat of wishes) {
+                    const idx = currentAvailable.indexOf(seat);
+                    if (idx !== -1) {
+                        assignedSeat = seat;
+                        currentAvailable.splice(idx, 1);
+                        break;
+                    }
+                }
+
+                // 策略 2: 無志願或志願被搶 -> 隨機分配
+                if (!assignedSeat) {
+                    if (currentAvailable.length > 0) {
+                        const randIdx = Math.floor(Math.random() * currentAvailable.length);
+                        assignedSeat = currentAvailable[randIdx];
+                        currentAvailable.splice(randIdx, 1);
+                    } else {
+                        console.warn(`學生 ${sid} 無位可坐！`);
+                    }
+                }
+
+                // 執行分發動畫
+                if (assignedSeat) {
+                    finalDistribution[sid] = assignedSeat;
+                    const seatEl = document.querySelector(`.seat[data-id="${assignedSeat}"]`);
+                    if (seatEl) {
+                        seatEl.classList.add('distributed');
+                        seatEl.querySelector('.student-id').textContent = sid;
+                    }
+                }
+
+                // 更新列表狀態
+                if(li) {
+                    li.classList.remove('active');
+                    li.classList.add('done');
+                    li.innerHTML += ` &rarr; <b>${assignedSeat || 'X'}</b>`;
+                }
+
+                // 暫停 1.5 秒讓老師看清楚
+                await new Promise(r => setTimeout(r, 1500));
+            }
+
+            alert("🎉 全部分發完畢！");
+            // 可選擇是否開啟重置按鈕
+            // document.getElementById('btnGenerate').disabled = false;
         }
 
         init();
