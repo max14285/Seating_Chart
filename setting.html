@@ -3,203 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>座位表規格設定</title>
+    <title>座位設定 (產生代碼)</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background-color: #f4f7f9; }
-        .controls { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); margin-bottom: 20px; width: 100%; max-width: 600px; }
-        .controls h2 { margin-top: 0; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        .input-group { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 15px; }
-        .input-group label { flex: 1; display: flex; align-items: center; }
-        .input-group input { flex: 1.5; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
-        #generateBtn { background-color: #007bff; color: white; }
-        #generateBtn:hover { background-color: #0056b3; }
-
-        .seating-chart { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); width: 100%; max-width: 900px; }
-        #seatMap { display: grid; gap: 5px; margin-top: 20px; }
-        .seat { background-color: #28a745; color: white; display: flex; align-items: center; justify-content: center; height: 50px; border-radius: 4px; cursor: pointer; transition: background-color 0.3s; font-weight: bold; font-size: 14px; }
-        .seat.unavailable { background-color: #dc3545; cursor: not-allowed; }
-        .seat:not(.unavailable):hover { background-color: #218838; }
-
-        .save-controls { margin-top: 20px; text-align: center; }
-        #saveBtn { background-color: #ffc107; color: #333; margin-left: 10px; }
-        #saveBtn:hover { background-color: #e0a800; }
-        
-        .note { margin-top: 20px; padding: 10px; background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; border-radius: 5px; font-weight: bold;}
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f9; display: flex; flex-direction: column; align-items: center; }
+        .controls, .seating-chart { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; width: 100%; max-width: 600px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .seat { background: #28a745; color: white; height: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; }
+        .seat.unavailable { background: #dc3545; }
+        #seatMap { display: grid; gap: 5px; margin-top: 10px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        textarea { width: 100%; height: 100px; margin-top: 10px; }
     </style>
 </head>
 <body>
-
     <div class="controls">
-        <h2>座位表規格設定</h2>
-        <p>點擊綠色座位標記為 **不可選**（紅色）。</p>
-        <div class="input-group">
-            <label for="rows">列數 (Rows):</label>
-            <input type="number" id="rows" value="5" min="1">
-        </div>
-        <div class="input-group">
-            <label for="cols">行數 (Cols):</label>
-            <input type="number" id="cols" value="6" min="1">
-        </div>
-        <button id="generateBtn">產生座位表</button>
+        <h2>1. 設定規格</h2>
+        列數: <input type="number" id="rows" value="5" min="1" style="width:50px"> 
+        行數: <input type="number" id="cols" value="6" min="1" style="width:50px">
+        <button id="generateBtn">產生/重置座位表</button>
     </div>
 
     <div class="seating-chart">
-        <h2>座位佈局預覽</h2>
+        <h2>2. 點擊座位切換紅/綠 (紅=不坐人)</h2>
         <div id="seatMap"></div>
-        <div class="save-controls">
-            <button id="saveBtn">儲存規格 (下載 config.json)</button>
-        </div>
-    </div>
-    
-    <div class="note">
-        **重要提示：** 點擊儲存後，會下載 **config.json** 檔案。您必須手動將此檔案提交到您的 GitHub 儲存庫中，其他頁面才能讀取最新的配置。
+        <br>
+        <button id="exportBtn">3. 產生設定代碼</button>
+        <p>請複製下方代碼，貼到 Google Sheet <b>SystemData</b> 分頁的 <b>B2</b> 儲存格：</p>
+        <textarea id="outputCode" readonly></textarea>
     </div>
 
     <script>
-        const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
-        const seatMapDiv = document.getElementById('seatMap');
-        const rowsInput = document.getElementById('rows');
-        const colsInput = document.getElementById('cols');
-        const generateBtn = document.getElementById('generateBtn');
-        const saveBtn = document.getElementById('saveBtn');
-
-        // 儲存學生名單到 localStorage (這是所有頁面需要的背景資料，只需在此頁面設定一次)
-        const studentData = {
-            "1": "林雨蓉", "2": "張婕緹", "3": "郭禹彤", "4": "馮筠雲", "5": "鄒念慈", "6": "鐘婕恩", "7": "方尚偉",
-            "8": "王沅丞", "9": "王敬謀", "10": "吳冠毅", "11": "吳柏宏", "12": "林宥宇", "13": "施禹劭", "14": "張緣啟",
-            "15": "曹晉宸", "16": "許見齊", "17": "郭丞翔", "18": "陳心禾", "19": "陳治翰", "20": "陳軍錡", "21": "單瑞誠",
-            "22": "曾子恩", "23": "黃彥恆", "24": "劉弘凱", "25": "潘冠穎", "26": "蔡佳恩", "27": "謝承恩", "28": "鍾政翰",
-            "29": "龔稚鈞"
-        };
-        localStorage.setItem('student_data', JSON.stringify(studentData));
+        const ROW_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+        const seatMap = document.getElementById('seatMap');
         
-        /**
-         * 根據 Row 和 Col 產生座位 ID (例如: A1, B5)
-         */
-        function getSeatId(r, c) {
-            return `${ROW_LETTERS[r]}${c}`;
-        }
+        // 產生座位表
+        function generateMap() {
+            const rows = parseInt(document.getElementById('rows').value);
+            const cols = parseInt(document.getElementById('cols').value);
+            seatMap.innerHTML = '';
+            seatMap.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 
-        /**
-         * 渲染座位表
-         */
-        function renderSeatMap(rows, cols, unavailableSeats = []) {
-            seatMapDiv.innerHTML = '';
-            seatMapDiv.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-
-            for (let r = 0; r < rows; r++) {
-                for (let c = 1; c <= cols; c++) {
-                    const seatId = getSeatId(r, c);
-                    const seatEl = document.createElement('div');
-                    seatEl.classList.add('seat');
-                    seatEl.textContent = seatId;
-                    seatEl.dataset.id = seatId;
-
-                    if (unavailableSeats.includes(seatId)) {
-                        seatEl.classList.add('unavailable');
-                    }
-                    
-                    // 點擊事件：切換座位狀態（可選/不可選）
-                    seatEl.addEventListener('click', function() {
-                        seatEl.classList.toggle('unavailable');
-                    });
-
-                    seatMapDiv.appendChild(seatEl);
+            for(let r=0; r<rows; r++){
+                for(let c=1; c<=cols; c++){
+                    const id = ROW_LETTERS[r] + c;
+                    const div = document.createElement('div');
+                    div.className = 'seat';
+                    div.textContent = id;
+                    div.dataset.id = id;
+                    div.onclick = () => div.classList.toggle('unavailable');
+                    seatMap.appendChild(div);
                 }
             }
         }
 
-        /**
-         * 下載 JSON 檔案的通用函數
-         */
-        function downloadJsonFile(data, filename) {
-            const dataStr = JSON.stringify(data, null, 4); 
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
+        document.getElementById('generateBtn').onclick = generateMap;
+        
+        document.getElementById('exportBtn').onclick = () => {
+            const rows = parseInt(document.getElementById('rows').value);
+            const cols = parseInt(document.getElementById('cols').value);
+            const unavailable = Array.from(document.querySelectorAll('.seat.unavailable')).map(el => el.dataset.id);
+            const config = JSON.stringify({ rows, cols, unavailable });
             
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            alert(`座位表規格已成功打包為 ${filename}，請下載後手動提交到 GitHub！`);
-        }
+            const output = document.getElementById('outputCode');
+            output.value = config;
+            output.select();
+            document.execCommand("copy");
+            alert("代碼已複製！請去 Google Sheet 的 SystemData 分頁，貼在 B2 儲存格。");
+        };
 
-        /**
-         * 載入並渲染已儲存的設定 (從 config.json 讀取)
-         */
-        async function loadSettings() {
-            try {
-                // 嘗試從 config.json 檔案讀取配置
-                const response = await fetch('config.json');
-                if (!response.ok) {
-                    throw new Error('config.json 檔案不存在或無法讀取');
-                }
-                const config = await response.json();
-                
-                if (config.rows && config.cols) {
-                    rowsInput.value = config.rows;
-                    colsInput.value = config.cols;
-                    renderSeatMap(config.rows, config.cols, config.unavailable || []);
-                } else {
-                    throw new Error('config.json 內容格式不正確');
-                }
-            } catch (error) {
-                console.warn('無法載入 config.json，使用預設值或請先設定規格:', error.message);
-                // 首次載入使用預設值
-                renderSeatMap(parseInt(rowsInput.value), parseInt(colsInput.value));
-            }
-        }
-
-        /**
-         * 處理產生座位表按鈕點擊
-         */
-        generateBtn.addEventListener('click', function() {
-            const rows = parseInt(rowsInput.value);
-            const cols = parseInt(colsInput.value);
-            if (rows > 0 && cols > 0 && rows <= ROW_LETTERS.length) {
-                renderSeatMap(rows, cols);
-            } else {
-                alert('請輸入有效的列數和行數。列數不能超過 ' + ROW_LETTERS.length + '。');
-            }
-        });
-
-        /**
-         * 處理儲存規格按鈕點擊 (下載 config.json)
-         */
-        saveBtn.addEventListener('click', function() {
-            const rows = parseInt(rowsInput.value);
-            const cols = parseInt(colsInput.value);
-            
-            if (rows <= 0 || cols <= 0 || rows > ROW_LETTERS.length) {
-                alert('請輸入有效的列數和行數。');
-                return;
-            }
-
-            const allSeats = seatMapDiv.querySelectorAll('.seat');
-            const unavailableSeats = [];
-            
-            allSeats.forEach(seat => {
-                if (seat.classList.contains('unavailable')) {
-                    unavailableSeats.push(seat.dataset.id);
-                }
-            });
-
-            const config = {
-                rows: rows,
-                cols: cols,
-                unavailable: unavailableSeats
-            };
-
-            downloadJsonFile(config, 'config.json');
-        });
-
-        // 頁面載入時執行
-        loadSettings();
+        generateMap(); // 預設執行一次
     </script>
 </body>
 </html>
