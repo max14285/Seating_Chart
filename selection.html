@@ -5,53 +5,173 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>學生志願選填</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f7f9; }
-        .controls { background: #fff; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
-        .seat { width: 60px; height: 60px; background: #007bff; color: white; display: flex; align-items: center; justify-content: center; margin: 2px; border-radius: 4px; cursor: pointer; }
-        .seat.unavailable { background: #6c757d; pointer-events: none; }
-        .seat.selected { border: 3px solid #ffc107; }
-        #seatMap { display: grid; gap: 5px; justify-content: center; }
+        /* --- 基礎設定 --- */
+        body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; padding: 20px; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
+        h1 { color: #333; margin-bottom: 10px; }
+
+        /* --- 控制區塊 --- */
+        .controls { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 600px; margin-bottom: 20px; text-align: center; }
+        select { padding: 10px; font-size: 16px; border-radius: 6px; border: 1px solid #ddd; width: 60%; margin-bottom: 15px; }
+        
+        /* 按鈕樣式 */
+        .btn-group { display: flex; gap: 10px; justify-content: center; }
+        button { padding: 10px 20px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-weight: bold; }
+        #uploadBtn { background-color: #007bff; color: white; flex: 2; }
+        #uploadBtn:hover:not(:disabled) { background-color: #0056b3; transform: translateY(-1px); }
+        #uploadBtn:disabled { background-color: #ccc; cursor: not-allowed; transform: none; }
+        #clearBtn { background-color: #dc3545; color: white; flex: 1; }
+        #clearBtn:hover { background-color: #a71d2a; }
+
+        /* --- 圖例說明 --- */
+        .legend { display: flex; gap: 15px; margin-bottom: 15px; font-size: 14px; color: #555; justify-content: center; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 15px; height: 15px; border-radius: 4px; border: 1px solid #ccc; }
+        
+        /* --- 座位表區域 --- */
+        .chart-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow-x: auto; max-width: 100%; display: flex; flex-direction: column; align-items: center; }
+        
+        /* --- 講台樣式 (新增) --- */
+        .stage-area {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px; /* 與座位的距離 */
+        }
+        .lectern {
+            width: 160px;
+            height: 45px;
+            background-color: #795548; /* 木頭色 */
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            font-size: 16px;
+            border-bottom: 4px solid #5d4037; /*立體感*/
+        }
+
+        #seatMap { display: grid; gap: 8px; justify-content: center; margin: 0 auto; }
+
+        /* --- 座位核心樣式 --- */
+        .seat {
+            width: 55px; height: 55px;
+            background-color: #f8f9fa; /* 未選：灰白 */
+            border: 2px solid #e9ecef;
+            color: #495057;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        /* 座位文字 */
+        .seat-id { font-size: 12px; color: #adb5bd; margin-top: 2px;}
+        .rank { font-size: 18px; font-weight: bold; line-height: 1; }
+
+        /* 互動效果 */
+        .seat:hover:not(.unavailable) {
+            border-color: #007bff;
+            background-color: #e7f1ff;
+        }
+
+        /* --- 狀態：已選 --- */
+        .seat.selected {
+            background-color: #007bff; /* 深藍底 */
+            border-color: #0056b3;
+            color: white; /* 白字 */
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+            z-index: 1;
+        }
+        .seat.selected .seat-id { color: rgba(255,255,255,0.7); }
+
+        /* --- 狀態：不可選 --- */
+        .seat.unavailable {
+            background-color: #ffebee; 
+            border-color: #ffcdd2;
+            color: #c62828;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* 提示 */
+        .info-text { margin-top: 20px; font-size: 0.9em; color: #666; background: #e2e3e5; padding: 10px; border-radius: 6px;}
+
     </style>
 </head>
 <body>
-    <h1>📝 志願選填</h1>
+
+    <h1>📝 志願選填系統</h1>
+
     <div class="controls">
-        <label>座號：</label>
-        <select id="studentSelect"><option value="">載入中...</option></select>
-        <button id="clearBtn">清空</button>
-        <button id="uploadBtn">上傳志願</button>
+        <label for="studentSelect" style="display:block; margin-bottom:5px; font-weight:bold;">請先選擇您的座號：</label>
+        <select id="studentSelect">
+            <option value="">資料載入中...</option>
+        </select>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:#f8f9fa;"></div> 未選</div>
+            <div class="legend-item"><div class="dot" style="background:#007bff;"></div> <strong>已選 (志願)</strong></div>
+            <div class="legend-item"><div class="dot" style="background:#ffebee;"></div> 不可坐</div>
+        </div>
+
+        <div class="btn-group">
+            <button id="clearBtn">清空重選</button>
+            <button id="uploadBtn">上傳志願</button>
+        </div>
     </div>
-    <div id="seatMap"></div>
+
+    <div class="chart-container">
+        <div class="stage-area">
+            <div class="lectern">講 台</div>
+        </div>
+
+        <div id="seatMap"></div>
+    </div>
+
+    <div class="info-text">
+        💡 <strong>操作說明：</strong> 點擊座位即可加入志願序 (1, 2, 3...)，再次點擊已選座位可取消。確認無誤後請按「上傳志願」。
+    </div>
 
     <script>
         // **********************************************
-        // 請填入您的資訊
 
-                // **請替換為您的 Google Form 設定值**
+        // **請替換為您的 Google Form 設定值**
         const FORM_ACTION_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfuPbctj-TvBmDtauc2pottDQR_NuFIssn9mUrfInG4DRkeKQ/formResponse'; 
         const FIELD_STUDENT_ID = 'entry.878919355'; 
         const FIELD_VOLUNTEERS = 'entry.1183865171';
         const APPS_SCRIPT_API_URL = 'https://script.google.com/macros/s/AKfycbz1qRFp0IC6RAUJvosl-ACMuCRD42S7mFUFZMp_vtsNs7nLLxhBWXtAfHm_E3E4iccOoA/exec'; // 與 distribution.html 共用
         // **********************************************
 
+
         const ROW_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
         let currentSelections = [];
-        let globalData = {}; // 存放從 API 抓回來的所有資料
+        let globalData = {}; 
 
         async function init() {
+            const select = document.getElementById('studentSelect');
             try {
+                // 從 Apps Script 讀取 SystemData
                 const res = await fetch(APPS_SCRIPT_API_URL);
                 const json = await res.json();
                 globalData = json.data;
-                
+
                 if (!globalData.students || !globalData.config) {
-                    alert("無法讀取設定！請確認老師是否已在 SystemData 分頁設定好 A2(名單) 和 B2(規格)。");
+                    select.innerHTML = '<option>設定檔讀取失敗</option>';
+                    alert("無法讀取設定！請確認 Google Sheet 的 SystemData 分頁。");
                     return;
                 }
 
                 populateSelect();
                 renderMap();
             } catch (e) {
+                console.error(e);
+                select.innerHTML = '<option>連線錯誤</option>';
                 alert("連線錯誤：" + e.message);
             }
         }
@@ -59,7 +179,7 @@
         function populateSelect() {
             const select = document.getElementById('studentSelect');
             select.innerHTML = '<option value="">-- 請選擇座號 --</option>';
-            // 排序座號
+            
             Object.keys(globalData.students).sort((a,b)=>a-b).forEach(id => {
                 const opt = document.createElement('option');
                 opt.value = id;
@@ -67,14 +187,13 @@
                 select.appendChild(opt);
             });
             
-            // 當選擇改變時
             select.addEventListener('change', function() {
                 const sid = this.value;
                 currentSelections = [];
-                if (sid && globalData.volunteers[sid]) {
+                if (sid && globalData.volunteers && globalData.volunteers[sid]) {
                     currentSelections = [...globalData.volunteers[sid]];
                 }
-                updateMap();
+                updateMap(); 
             });
         }
 
@@ -90,10 +209,15 @@
                     const div = document.createElement('div');
                     div.className = 'seat';
                     div.dataset.id = id;
-                    div.textContent = id;
+                    
+                    div.innerHTML = `
+                        <div class="rank"></div>
+                        <div class="seat-id">${id}</div>
+                    `;
                     
                     if (config.unavailable.includes(id)) {
                         div.className += ' unavailable';
+                        div.title = "此座位不可選";
                     } else {
                         div.onclick = () => toggleSeat(id);
                     }
@@ -104,23 +228,34 @@
 
         function toggleSeat(id) {
             const sid = document.getElementById('studentSelect').value;
-            if (!sid) return alert("請先選擇座號");
+            if (!sid) {
+                alert("⚠️ 請先在上方選單選擇您的「座號」！");
+                document.getElementById('studentSelect').focus();
+                return;
+            }
 
             const idx = currentSelections.indexOf(id);
-            if (idx === -1) currentSelections.push(id);
-            else currentSelections.splice(idx, 1);
+            if (idx === -1) {
+                currentSelections.push(id);
+            } else {
+                currentSelections.splice(idx, 1);
+            }
             
             updateMap();
         }
 
         function updateMap() {
             document.querySelectorAll('.seat').forEach(el => {
+                const id = el.dataset.id;
+                const rankDiv = el.querySelector('.rank');
+                
                 el.classList.remove('selected');
-                el.textContent = el.dataset.id; // 重置文字
-                const idx = currentSelections.indexOf(el.dataset.id);
+                rankDiv.textContent = ''; 
+
+                const idx = currentSelections.indexOf(id);
                 if (idx !== -1) {
                     el.classList.add('selected');
-                    el.textContent = idx + 1; // 顯示志願序
+                    rankDiv.textContent = idx + 1; 
                 }
             });
         }
@@ -130,7 +265,8 @@
             if (!sid) return alert("請先選擇座號");
             
             const btn = document.getElementById('uploadBtn');
-            btn.disabled = true; btn.textContent = "上傳中...";
+            btn.disabled = true; 
+            btn.textContent = "資料上傳中...";
 
             const formData = new URLSearchParams();
             formData.append(FIELD_STUDENT_ID, sid);
@@ -138,17 +274,26 @@
 
             fetch(FORM_ACTION_URL, { method: 'POST', mode: 'no-cors', body: formData })
             .then(() => {
-                alert("上傳成功！");
-                // 暫時更新本地數據，讓使用者不用重整就能看到變更
+                const name = globalData.students[sid];
+                alert(`✅ 上傳成功！\n${sid}號 ${name} 已提交 ${currentSelections.length} 個志願。`);
                 if(!globalData.volunteers) globalData.volunteers = {};
                 globalData.volunteers[sid] = currentSelections;
             })
-            .catch(() => alert("上傳失敗"))
-            .finally(() => { btn.disabled = false; btn.textContent = "上傳志願"; });
+            .catch((err) => {
+                alert("❌ 上傳失敗，請檢查網路。");
+                console.error(err);
+            })
+            .finally(() => { 
+                btn.disabled = false; 
+                btn.textContent = "上傳志願"; 
+            });
         };
         
         document.getElementById('clearBtn').onclick = () => {
-             if(confirm("清空當前志願？")) {
+             const sid = document.getElementById('studentSelect').value;
+             if (!sid) return alert("請先選擇座號");
+             
+             if(confirm("確定要清空目前選填的所有志願嗎？(需再次按上傳才算數)")) {
                  currentSelections = [];
                  updateMap();
              }
