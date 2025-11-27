@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>座位分發系統</title>
+    <title>座位分發系統 - 第三段程式</title>
     <style>
+        /* ... CSS 樣式與之前版本相同，為了簡潔在此省略 ... */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f7f9; }
         h1 { color: #007bff; text-align: center; }
         
@@ -12,7 +13,6 @@
         .sidebar { width: 250px; background-color: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
         .chart-area { flex-grow: 1; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
 
-        /* 分發按鈕 */
         #distributeBtn { 
             padding: 12px 25px; background-color: #ffc107; color: #333; 
             border: none; border-radius: 4px; cursor: pointer; font-size: 18px; 
@@ -22,19 +22,16 @@
         #distributeBtn:hover:not(:disabled) { background-color: #e0a800; }
         #distributeBtn:disabled { background-color: #ccc; cursor: not-allowed; }
 
-        /* 學生列表 */
         .student-list-item { padding: 5px 0; border-bottom: 1px dotted #eee; display: flex; justify-content: space-between; font-size: 14px; }
         .status-filled { color: #28a745; font-weight: bold; }
         .status-empty { color: #dc3545; }
 
-        /* 分發順序 */
         #distributionOrder { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
         #orderList { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; padding: 0; margin: 0; }
         #orderList li { padding: 4px 8px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 3px; font-size: 14px; transition: background-color 0.5s; }
         #orderList li.current-student { background-color: #ffc107; font-weight: bold; border-color: #ffaa00; }
         #orderList li.distributed { background-color: #28a745; color: white; }
         
-        /* 座位表 */
         #seatMap { display: grid; gap: 5px; margin-top: 20px; }
         .seat { 
             background-color: #e9ecef; color: #333; font-weight: bold; 
@@ -84,38 +81,39 @@
         let volunteerData = {};
         let finalDistribution = {}; 
         let availableSeats = []; 
+        
+        // **請替換為您的 Apps Script Web App URL**
+        const APPS_SCRIPT_API_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL'; 
 
         /**
-         * 讀取所有所需的數據 (從 config.json 和 volunteers.json 讀取)
+         * 讀取所有所需的數據 (從 config.json 和 Apps Script API 讀取)
          */
         async function loadData() {
             try {
-                // 載入學生名單 (從 LocalStorage 讀取)
+                // 1. 載入學生名單 (從 LocalStorage 讀取)
                 const studentStr = localStorage.getItem('student_data');
                 if (!studentStr) throw new Error('學生名單未載入，請先運行 setting.html');
                 studentData = JSON.parse(studentStr);
 
-                // 從 config.json 檔案載入座位配置
+                // 2. 從 config.json 檔案載入座位配置
                 const configResponse = await fetch('config.json');
-                if (!configResponse.ok) throw new Error('config.json 檔案不存在或無法讀取。請先在 setting.html 儲存配置。');
+                if (!configResponse.ok) throw new Error('config.json 檔案不存在。請先在 setting.html 儲存配置。');
                 seatingConfig = await configResponse.json();
 
-                // 從 volunteers.json 檔案載入志願結果
-                const volunteerResponse = await fetch('volunteers.json');
-                if (volunteerResponse.ok && volunteerResponse.status !== 204) {
-                    const text = await volunteerResponse.text();
-                    volunteerData = text ? JSON.parse(text) : {}; 
-                } else {
-                    volunteerData = {}; 
-                }
+                // 3. 從 Apps Script JSON API 載入最新志願結果
+                const volunteerResponse = await fetch(APPS_SCRIPT_API_URL);
+                if (!volunteerResponse.ok) throw new Error('無法讀取 Apps Script API。請確認 URL 或網路連接。');
+                
+                const apiResult = await volunteerResponse.json(); 
+                volunteerData = apiResult.data || {}; 
 
-                // 從 LocalStorage 載入最終分發結果 (分發後儲存於此，方便重整頁面)
+                // 4. 從 LocalStorage 載入最終分發結果 (用於重整頁面)
                 const finalDistributionStr = localStorage.getItem('final_distribution');
                 if (finalDistributionStr) {
                     finalDistribution = JSON.parse(finalDistributionStr);
                 }
                 
-                // 計算可選座位
+                // 5. 計算可選座位
                 availableSeats = [];
                 for (let r = 0; r < seatingConfig.rows; r++) {
                     for (let c = 1; c <= seatingConfig.cols; c++) {
@@ -134,6 +132,8 @@
                 return false;
             }
         }
+        
+        // ... (renderStudentStatus, renderSeatMap, generateRandomOrder, startDistribution 函數都與之前版本相同，在此省略)
 
         /**
          * 渲染學生選填狀態列表
@@ -160,15 +160,14 @@
         }
 
         /**
-         * 渲染座位表 (顯示最終分發結果或空白)
+         * 渲染座位表
          */
         function renderSeatMap() {
             if (!seatingConfig) return;
-
+            // ... (與之前版本相同)
             seatMapDiv.innerHTML = '';
             seatMapDiv.style.gridTemplateColumns = `repeat(${seatingConfig.cols}, auto)`;
 
-            // 反轉 finalDistribution 方便查找學生座號
             const studentToSeat = {};
             for (const seatId in finalDistribution) {
                 const studentId = finalDistribution[seatId];
@@ -181,9 +180,6 @@
                     const seatEl = document.createElement('div');
                     seatEl.classList.add('seat');
                     
-                    // 找出哪個學生的座位是這個
-                    const studentId = Object.keys(studentToSeat).find(id => studentToSeat[id] === seatId);
-
                     seatEl.innerHTML = `
                         <div class="student-id">${finalDistribution[seatId] || ''}</div>
                         <div class="seat-id">${seatId}</div>
@@ -200,13 +196,12 @@
                 }
             }
         }
-
+        
         /**
          * 產生隨機分發順序
          */
         function generateRandomOrder() {
             const studentIds = Object.keys(studentData);
-            // Fisher-Yates Shuffle 演算法
             for (let i = studentIds.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [studentIds[i], studentIds[j]] = [studentIds[j], studentIds[i]];
@@ -219,9 +214,9 @@
          */
         async function startDistribution() {
             distributeBtn.disabled = true;
-            finalDistribution = {}; // 清空上一次的分發結果
+            finalDistribution = {}; 
             orderListUl.innerHTML = '';
-            renderSeatMap(); // 顯示空白座位表
+            renderSeatMap(); 
             
             let currentAvailableSeats = [...availableSeats]; 
 
@@ -252,9 +247,8 @@
                     const index = currentAvailableSeats.indexOf(wishSeat);
                     
                     if (index !== -1) {
-                        // 志願座位可用
                         assignedSeat = wishSeat;
-                        currentAvailableSeats.splice(index, 1); // 移除此座位
+                        currentAvailableSeats.splice(index, 1); 
                         break;
                     }
                 }
