@@ -245,7 +245,7 @@
             }
         }
 
-        // 步驟 1: 產生隨機數與順序
+        // 步驟 1: 產生隨機數與順序 (修正版：使用浮點數確保公平)
         function generateOrder() {
             distributionOrder = [];
             const studentIds = Object.keys(globalData.students);
@@ -253,22 +253,31 @@
 
             // 計算分數
             studentIds.forEach(id => {
-                const baseScore = Math.floor(Math.random() * 100); // 0-99 隨機數
+                // 1. 移除 Math.floor，保留小數點 (例如 85.4123...)
+                const baseScore = Math.random() * 25+25; 
                 const adj = adjustments[id] || 0;
                 const totalScore = baseScore + adj;
 
-                // 更新表格顯示: 85 (+5)
+                // 2. 為了畫面美觀，計算一個顯示用的分數 (取小數點後1位)
+                const displayBase = baseScore.toFixed(1);
+                const displayTotal = totalScore.toFixed(1);
+
+                // 更新表格顯示
                 const cell = document.getElementById(`score-${id}`);
                 if(cell) {
                     const sign = adj >= 0 ? '+' : '';
-                    cell.innerHTML = `<b>${totalScore}</b> <span style="color:#888;font-size:10px;">(${baseScore}${sign}${adj})</span>`;
+                    // 顯示格式：85.4 (80.4+5)
+                    cell.innerHTML = `<b>${displayTotal}</b> <span style="color:#888;font-size:11px;">(${displayBase}${sign}${adj})</span>`;
                 }
 
+                // 存入原始的浮點數 totalScore 用於精確排序
                 scoreList.push({ id, totalScore });
             });
 
             // 排序 (高分在前)
+            // 因為 totalScore 是長串小數，幾乎不可能完全相等
             scoreList.sort((a, b) => b.totalScore - a.totalScore);
+            
             distributionOrder = scoreList.map(item => item.id);
 
             // 更新左下角順序列表
@@ -277,6 +286,22 @@
             // 啟用開始分發按鈕
             document.getElementById('btnStart').disabled = false;
             alert("隨機數已產生！請確認順序無誤後，按下「開始分發」。");
+        }
+        
+        // 配合修改列表顯示 (取小數點1位)
+        function renderOrderList(scoreList) {
+            const ul = document.getElementById('orderList');
+            ul.innerHTML = '';
+            scoreList.forEach((item, index) => {
+                const name = globalData.students[item.id];
+                const li = document.createElement('li');
+                li.id = `order-${item.id}`;
+                li.innerHTML = `
+                    <span>#${index+1} <b>${item.id}號</b> ${name}</span>
+                    <span>${item.totalScore.toFixed(1)}分</span>
+                `;
+                ul.appendChild(li);
+            });
         }
 
         function renderOrderList(scoreList) {
