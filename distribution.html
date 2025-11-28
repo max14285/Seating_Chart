@@ -298,7 +298,7 @@
                 li.id = `order-${item.id}`;
                 li.innerHTML = `
                     <span>#${index+1} <b>${item.id}號</b> ${name}</span>
-                    <span>${item.totalScore.toFixed(1)}分</span>
+                    <span>${item.totalScore.toFixed(0)}分</span>
                 `;
                 ul.appendChild(li);
             });
@@ -313,7 +313,7 @@
                 li.id = `order-${item.id}`;
                 li.innerHTML = `
                     <span>#${index+1} <b>${item.id}號</b> ${name}</span>
-                    <span>${item.totalScore}分</span>
+                    <span>${item.totalScore.toFixed(0)}分</span>
                 `;
                 ul.appendChild(li);
             });
