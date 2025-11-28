@@ -259,8 +259,8 @@
                 const totalScore = baseScore + adj;
 
                 // 2. 為了畫面美觀，計算一個顯示用的分數 (取小數點後1位)
-                const displayBase = baseScore.toFixed(1);
-                const displayTotal = totalScore.toFixed(1);
+                const displayBase = baseScore.toFixed(0);
+                const displayTotal = totalScore.toFixed(0);
 
                 // 更新表格顯示
                 const cell = document.getElementById(`score-${id}`);
