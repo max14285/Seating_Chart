@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系統功能導覽</title>
+    <style>
+        /* 基本頁面排版與背景設定 */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        /* 導覽選單容器設計 */
+        .nav-container {
+            background-color: #ffffff;
+            padding: 40px 50px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .nav-container h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 26px;
+        }
+
+        /* 按鈕樣式設計 */
+        .nav-button {
+            display: block;
+            width: 100%;
+            padding: 16px 0;
+            margin-bottom: 18px;
+            background-color: #3498db;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);
+        }
+
+        /* 按鈕懸浮與點擊效果 */
+        .nav-button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .nav-button:active {
+            transform: translateY(0);
+        }
+
+        /* 為設定頁面設定不同的顏色以作區別 */
+        .nav-button.settings {
+            background-color: #7f8c8d;
+            box-shadow: 0 4px 6px rgba(127, 140, 141, 0.2);
+        }
+
+        .nav-button.settings:hover {
+            background-color: #636e72;
+        }
+        
+        /* 頁尾小字 */
+        .footer-text {
+            margin-top: 25px;
+            font-size: 13px;
+            color: #95a5a6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="nav-container">
+        <h1>🛠️ 系統導覽選單</h1>
+        
+        <!-- 連結至分配頁面 -->
+        <a href="distribution.html" class="nav-button">
+            分配系統 (Distribution)
+        </a>
+        
+        <!-- 連結至選擇頁面 -->
+        <a href="selection.html" class="nav-button">
+            選擇系統 (Selection)
+        </a>
+        
+        <!-- 連結至設定頁面 -->
+        <a href="setting.html" class="nav-button settings">
+            系統設定 (Setting)
+        </a>
+
+        <div class="footer-text">
+            請點擊上方按鈕進入對應分頁
+        </div>
+    </div>
+
+</body>
+</html>
